@@ -8,9 +8,16 @@ const port = process.env.PORT || 5000;
 
 //middleware
 
-app.use(cors());
-app.use(express.json())
 
+app.use(express.json());
+
+const corsOptions={
+    origin:'*',
+    credentials:true,
+    optionSuccessStatus:200,
+}
+
+app.use(cors(corsOptions));
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.5jqcqmr.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -31,7 +38,7 @@ async function run() {
         const database = client.db("fashionDB");
         const brandCollection = database.collection("brands");
         const brandProductsCollection = database.collection("brandProducts");
-        const cartProductsCollection = database.collection("cartProducts");
+        let cartProductsCollection;
 
         app.get("/brands", async (req, res) => {
 
@@ -52,21 +59,21 @@ async function run() {
         })
         app.get("/productDetails/:productId", async (req, res) => {
 
-        
+
             const getProductDetails = req.params.productId;
 
-            const query = {_id: new ObjectId(getProductDetails) }
+            const query = { _id: new ObjectId(getProductDetails) }
 
             const result = await brandProductsCollection.find(query).toArray();
             res.send(result);
         })
         app.get("/updateProducts/:id", async (req, res) => {
 
-        
+
             console.log(req.params.id)
             const getProductDetails = req.params.id;
 
-            const query = {_id: new ObjectId(getProductDetails) }
+            const query = { _id: new ObjectId(getProductDetails) }
 
             const result = await brandProductsCollection.find(query).toArray();
             res.send(result);
@@ -76,7 +83,7 @@ async function run() {
         app.post("/brandProducts", async (req, res) => {
 
             console.log('Inside post hitting')
-            console.log(req.body);
+            // console.log(req.body);
 
 
             const product = req.body;
@@ -86,23 +93,35 @@ async function run() {
             console.log(result);
 
         })
-        app.post("/cartProducts", async (req, res) => {
+        app.post("/cartProducts/:userEmail", async (req, res) => {
 
-            console.log('Inside post hitting')
-            console.log(req.body);
+            // console.log(req.params.userEmail)
+            
+          
+            try {
+                cartProductsCollection = database.collection(`cartProducts${req.params.userEmail}`);
 
 
-            const product = req.body;
-            const result = await cartProductsCollection.insertOne(product);
-            res.send(result);
 
-            console.log(result);
+                const product = req.body;
+                const result = await cartProductsCollection.insertOne(product);
+                res.send(result);
+            } catch (error) {
+                res.status(500).json({ errorCode: error.code, errorMessage: error.message });
+            }
+
+
 
         })
-        app.get("/cart", async (req, res) => {
+        app.get("/cart/:userEmail", async (req, res) => {
 
-            const cursor = cartProductsCollection.find();
-            const result = await cursor.toArray();
+            const cartProductsCollection = database.collection(`cartProducts${req.params.userEmail}`);
+
+
+            const query = { email: req.params.userEmail }
+
+            const result = await cartProductsCollection.find(query).toArray();
+            console.log(result)
             res.send(result)
 
         })
@@ -137,17 +156,17 @@ async function run() {
         })
 
         app.delete("/product/:id", async (req, res) => {
-            console.log("delete id: ", req.params.id)
-            const deleteProduct = req.params.id;
-
-            const query = { _id: deleteProduct }
-            console.log(query)
-
-            const result = await cartProductsCollection.deleteOne(query);
+        
+           
+                const deleteProduct = req.params.id;
+                const query = { _id: deleteProduct };
+        
+                const result = await cartProductsCollection.deleteOne(query);
+                res.send(result)
+        
+                
             
-            res.send(result);
-        })
-
+        });
         
 
 
@@ -155,8 +174,10 @@ async function run() {
 
 
 
+
+
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
